@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/refs */
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -17,7 +16,7 @@ import {
 } from "@tiptap/react";
 import type { SuggestionOptions } from "@tiptap/suggestion";
 import Suggestion from "@tiptap/suggestion";
-import { Cuboid, FileText } from "lucide-react";
+import { Box, FileText } from "lucide-react";
 import * as React from "react";
 import { useImperativeHandle, useState } from "react";
 
@@ -831,7 +830,7 @@ export const TextEditor = React.forwardRef<TamboEditor, TextEditorProps>(
         <SuggestionPopover
           state={resourceState}
           onClose={() => resourceRef.current.setState({ isOpen: false })}
-          defaultIcon={<Cuboid className="w-4 h-4 flex-shrink-0 mt-0.5" />}
+          defaultIcon={<Box className="w-4 h-4 flex-shrink-0 mt-0.5" />}
           emptyMessage="No results found"
           monoSecondary
         />

@@ -1,6 +1,12 @@
-import type { TamboThreadMessage } from "@tambo-ai/react";
 import * as React from "react";
 import { useEffect, useState } from "react";
+
+type ThreadContentPart =
+  | { type?: "text"; text?: string }
+  | { type?: "resource"; resource?: { uri?: string } }
+  | { type?: "image_url"; image_url?: { url?: string } };
+
+type ThreadContentValue = string | ThreadContentPart[];
 
 /**
  * Merges multiple refs into a single callback ref.
@@ -153,7 +159,7 @@ export function usePositioning(
  * @returns A renderable string or React element.
  */
 export function getSafeContent(
-  content: TamboThreadMessage["content"] | React.ReactNode | undefined | null,
+  content: ThreadContentValue | React.ReactNode | undefined | null,
 ): string | React.ReactElement {
   if (!content) return "";
   if (typeof content === "string") return content;
@@ -214,7 +220,7 @@ function hasContentInItem(item: unknown): boolean {
  * @returns True if there is content, false otherwise.
  */
 export function checkHasContent(
-  content: TamboThreadMessage["content"] | React.ReactNode | undefined | null,
+  content: ThreadContentValue | React.ReactNode | undefined | null,
 ): boolean {
   if (!content) return false;
   if (typeof content === "string") return content.trim().length > 0;

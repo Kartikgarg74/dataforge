@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="64" fill="#1e293b"/>
+  <!-- Bar chart bars -->
+  <rect x="100" y="300" width="60" height="120" rx="8" fill="#3b82f6"/>
+  <rect x="190" y="220" width="60" height="200" rx="8" fill="#60a5fa"/>
+  <rect x="280" y="160" width="60" height="260" rx="8" fill="#3b82f6"/>
+  <rect x="370" y="100" width="60" height="320" rx="8" fill="#60a5fa"/>
+  <!-- DF text -->
+  <text x="256" y="70" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="56" fill="#f8fafc">DF</text>
+</svg>

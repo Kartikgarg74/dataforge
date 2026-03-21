@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 // These will be actual server actions
-// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 'use server';
 
 import { executeQuery, getDatabaseSchema } from '@/db/connection';
@@ -10,15 +9,12 @@ const rowSchema = z.object({}).passthrough();
 
 export async function getDatabaseSchemaAction() {
   'use server';
-  return { schema: getDatabaseSchema() };
+  return { schema: await getDatabaseSchema() };
 }
 
 export async function executeSQLAction(params: { query: string }) {
   'use server';
-  if (!params.query.trim().toLowerCase().startsWith('select')) {
-    throw new Error('Only SELECT queries allowed');
-  }
-  const { results, columns } = executeQuery(params.query);
+  const { results, columns } = await executeQuery(params.query);
   return { results, columns, rowCount: results.length };
 }
 

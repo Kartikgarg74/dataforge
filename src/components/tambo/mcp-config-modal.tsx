@@ -3,12 +3,21 @@
 import { createMarkdownComponents } from "@/components/tambo/markdown-components";
 import { cn } from "@/lib/utils";
 import {
+  MCP_STORAGE_KEY,
+  MCP_UPDATED_EVENT,
+  type McpServerConfig,
+  type McpTransport,
+} from "@/lib/mcp/types";
+import {
+  getMcpServersSnapshot,
+  useMcpServers as useMcpServersFromClient,
+} from "@/lib/mcp/client";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
-import { type McpServerInfo, MCPTransport } from "@tambo-ai/react";
 import { motion } from "framer-motion";
 import { ChevronDown, Trash2, X } from "lucide-react";
 import React from "react";
@@ -37,19 +46,12 @@ export const McpConfigModal = ({
   className?: string;
 }) => {
   // Initialize from localStorage directly to avoid conflicts
-  const [mcpServers, setMcpServers] = React.useState<McpServerInfo[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(localStorage.getItem("mcp-servers") ?? "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [mcpServers, setMcpServers] = React.useState<McpServerConfig[]>(() =>
+    getMcpServersSnapshot(),
+  );
   const [serverUrl, setServerUrl] = React.useState("");
   const [serverName, setServerName] = React.useState("");
-  const [transportType, setTransportType] = React.useState<MCPTransport>(
-    MCPTransport.HTTP,
-  );
+  const [transportType, setTransportType] = React.useState<McpTransport>("http");
   const [savedSuccess, setSavedSuccess] = React.useState(false);
   const [showInstructions, setShowInstructions] = React.useState(false);
 
@@ -73,11 +75,11 @@ export const McpConfigModal = ({
   // Save servers to localStorage when updated and emit events
   React.useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-servers", JSON.stringify(mcpServers));
+      localStorage.setItem(MCP_STORAGE_KEY, JSON.stringify(mcpServers));
 
       // Emit custom event to notify other components in the same tab
       window.dispatchEvent(
-        new CustomEvent("mcp-servers-updated", {
+        new CustomEvent(MCP_UPDATED_EVENT, {
           detail: mcpServers,
         }),
       );
@@ -103,7 +105,7 @@ export const McpConfigModal = ({
       // Reset form fields
       setServerUrl("");
       setServerName("");
-      setTransportType(MCPTransport.HTTP);
+      setTransportType("http");
     }
   };
 
@@ -112,16 +114,12 @@ export const McpConfigModal = ({
   };
 
   // Helper function to get server display information
-  const getServerInfo = (server: McpServerInfo) => {
-    if (typeof server === "string") {
-      return { url: server, transport: "HTTP (default)", name: null };
-    } else {
-      return {
-        url: server.url,
-        transport: server.transport ?? "HTTP (default)",
-        name: server.name ?? null,
-      };
-    }
+  const getServerInfo = (server: McpServerConfig) => {
+    return {
+      url: server.url,
+      transport: getTransportDisplayText(server.transport ?? "http"),
+      name: server.name ?? null,
+    };
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -131,8 +129,8 @@ export const McpConfigModal = ({
     }
   };
 
-  const getTransportDisplayText = (transport: MCPTransport) => {
-    return transport === MCPTransport.HTTP ? "HTTP (default)" : "SSE";
+  const getTransportDisplayText = (transport: McpTransport) => {
+    return transport === "http" ? "HTTP (default)" : "SSE";
   };
 
   if (!isOpen) return null;
@@ -308,13 +306,13 @@ function MyApp() {
                   >
                     <DropdownMenuItem
                       className="px-3 py-2 text-sm text-foreground hover:bg-muted-backdrop cursor-pointer focus:bg-muted-backdrop focus:outline-none"
-                      onClick={() => setTransportType(MCPTransport.HTTP)}
+                      onClick={() => setTransportType("http")}
                     >
                       HTTP (default)
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="px-3 py-2 text-sm text-foreground hover:bg-muted-backdrop cursor-pointer focus:bg-muted-backdrop focus:outline-none"
-                      onClick={() => setTransportType(MCPTransport.SSE)}
+                      onClick={() => setTransportType("sse")}
                     >
                       SSE
                     </DropdownMenuItem>
@@ -378,6 +376,8 @@ function MyApp() {
                       <button
                         onClick={() => removeServer(index)}
                         className="ml-4 px-3 py-1.5 text-sm bg-destructive/20 text-destructive rounded-md hover:bg-destructive/30 focus:outline-none focus:ring-2 focus:ring-destructive focus:ring-offset-1 transition-colors duration-150 flex-shrink-0"
+                        aria-label="Remove MCP server"
+                        title="Remove server"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -453,7 +453,7 @@ function MyApp() {
 /**
  * Type for MCP Server entries
  */
-export type McpServer = string | { url: string };
+export type McpServer = McpServerConfig;
 
 /**
  * Load and reactively track MCP server configurations from browser localStorage.
@@ -479,72 +479,5 @@ export type McpServer = string | { url: string };
  * ```
  */
 export function useMcpServers(): McpServer[] {
-  const [servers, setServers] = React.useState<McpServer[]>(() => {
-    if (typeof window === "undefined") return [];
-
-    const savedServersData = localStorage.getItem("mcp-servers");
-    if (!savedServersData) return [];
-
-    try {
-      const servers = JSON.parse(savedServersData);
-      // Deduplicate servers by URL to prevent multiple tool registrations
-      const uniqueUrls = new Set();
-      return servers.filter((server: McpServer) => {
-        const url = typeof server === "string" ? server : server.url;
-        if (uniqueUrls.has(url)) return false;
-        uniqueUrls.add(url);
-        return true;
-      });
-    } catch (e) {
-      console.error("Failed to parse saved MCP servers", e);
-      return [];
-    }
-  });
-
-  React.useEffect(() => {
-    const updateServers = () => {
-      if (typeof window === "undefined") return;
-
-      const savedServersData = localStorage.getItem("mcp-servers");
-      if (!savedServersData) {
-        setServers([]);
-        return;
-      }
-
-      try {
-        const newServers = JSON.parse(savedServersData);
-        // Deduplicate servers by URL
-        const uniqueUrls = new Set();
-        const deduped = newServers.filter((server: McpServer) => {
-          const url = typeof server === "string" ? server : server.url;
-          if (uniqueUrls.has(url)) return false;
-          uniqueUrls.add(url);
-          return true;
-        });
-        setServers(deduped);
-      } catch (e) {
-        console.error("Failed to parse saved MCP servers", e);
-        setServers([]);
-      }
-    };
-
-    // Listen for custom events (same tab updates)
-    const handleCustomEvent = () => updateServers();
-    window.addEventListener("mcp-servers-updated", handleCustomEvent);
-
-    // Listen for storage events (cross-tab updates)
-    const handleStorageEvent = (e: StorageEvent) => {
-      if (e.key === "mcp-servers") {
-        updateServers();
-      }
-    };
-    window.addEventListener("storage", handleStorageEvent);
-
-    return () => {
-      window.removeEventListener("mcp-servers-updated", handleCustomEvent);
-      window.removeEventListener("storage", handleStorageEvent);
-    };
-  }, []);
-
-  return servers;
+  return useMcpServersFromClient();
 }

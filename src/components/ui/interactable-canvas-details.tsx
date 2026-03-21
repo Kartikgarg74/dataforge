@@ -1,7 +1,7 @@
 "use client";
 
 import { useCanvasStore } from "@/lib/canvas-storage";
-import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
+import { useInteractableStore } from "@/lib/interactable-store";
 import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
@@ -33,21 +33,29 @@ type CanvasDetailsProps = z.infer<typeof canvasDetailsPropsSchema> & {
 
 function CanvasDetailsWrapper(props: CanvasDetailsProps) {
   const { className, state, onPropsUpdate, interactableId } = props;
-  const { updateInteractableComponentProps, interactableComponents } =
-    useTamboInteractable();
+  const storeState = useInteractableStore((s) =>
+    interactableId ? s.propsById[interactableId]?.state : undefined,
+  );
+  const setInteractableProps = useInteractableStore(
+    (s) => s.setInteractableProps,
+  );
 
   const applyingRef = useRef(false);
   const lastEmittedKeyRef = useRef("");
-
-  // Use ref to avoid infinite re-render loops when interactableComponents changes
-  const interactableComponentsRef = useRef(interactableComponents);
-  useEffect(() => {
-    interactableComponentsRef.current = interactableComponents;
-  }, [interactableComponents]);
+  const lastAppliedKeyRef = useRef("");
 
   // Inbound: apply edits to active canvas
   useEffect(() => {
-    if (!state) return;
+    const inboundState = state ?? storeState;
+    const parsed = canvasDetailsPropsSchema
+      .shape.state
+      .safeParse(inboundState);
+    if (!parsed.success || !parsed.data) return;
+
+    const inboundKey = JSON.stringify(parsed.data);
+    if (inboundKey === lastAppliedKeyRef.current) return;
+    lastAppliedKeyRef.current = inboundKey;
+
     applyingRef.current = true;
     const s = useCanvasStore.getState();
     const activeId = s.activeCanvasId;
@@ -55,7 +63,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
       applyingRef.current = false;
       return;
     }
-    const shards = state.charts ?? [];
+    const shards = parsed.data.charts ?? [];
 
     // Reorder based on provided order and update title/type
     // Build a map for quick lookup
@@ -92,7 +100,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
     setTimeout(() => {
       applyingRef.current = false;
     }, 0);
-  }, [state]);
+  }, [state, storeState]);
 
   // Helper to build charts payload
   const buildChartsPayload = () => {
@@ -116,9 +124,6 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
     return { charts };
   };
 
-  // Ref to track if we've done initial publish
-  const hasPublishedInitialRef = useRef(false);
-
   // Helper to publish payload
   const publishPayload = useCallback((payload: { charts: { id: string; title: string; type: "bar" | "line" | "pie" }[] }) => {
     const key = JSON.stringify(payload);
@@ -126,17 +131,12 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
     lastEmittedKeyRef.current = key;
     onPropsUpdate?.({ state: payload, className });
     if (interactableId) {
-      const match = interactableComponentsRef.current.find(
-        (c) => c.props?.interactableId === interactableId,
-      );
-      if (match) {
-        updateInteractableComponentProps(match.id, {
-          state: payload,
-          className,
-        });
-      }
+      setInteractableProps(interactableId, {
+        state: payload,
+        className,
+      });
     }
-  }, [onPropsUpdate, className, interactableId, updateInteractableComponentProps]);
+  }, [onPropsUpdate, className, interactableId, setInteractableProps]);
 
   // Outbound: publish simplified charts snapshot for active canvas on store changes
   useEffect(() => {
@@ -148,40 +148,10 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
     return () => unsubscribe();
   }, [publishPayload]);
 
-  // Initial publish: poll until interactable components are registered
+  // Initial publish for late subscribers.
   useEffect(() => {
-    if (hasPublishedInitialRef.current) return;
-
-    const tryPublishInitial = () => {
-      if (hasPublishedInitialRef.current) return true;
-      if (interactableComponentsRef.current.length > 0) {
-        const payload = buildChartsPayload();
-        publishPayload(payload);
-        hasPublishedInitialRef.current = true;
-        return true;
-      }
-      return false;
-    };
-
-    // Try immediately
-    if (tryPublishInitial()) return;
-
-    // Poll a few times to catch when components are registered
-    const intervalId = setInterval(() => {
-      if (tryPublishInitial()) {
-        clearInterval(intervalId);
-      }
-    }, 50);
-
-    // Clean up after 1 second max
-    const timeoutId = setTimeout(() => {
-      clearInterval(intervalId);
-    }, 1000);
-
-    return () => {
-      clearInterval(intervalId);
-      clearTimeout(timeoutId);
-    };
+    const payload = buildChartsPayload();
+    publishPayload(payload);
   }, [publishPayload]);
 
   // Minimal UI (hidden content is fine; needs to be rendered for MCP)
@@ -192,12 +162,4 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
   );
 }
 
-export const InteractableCanvasDetails = withInteractable(
-  CanvasDetailsWrapper,
-  {
-    componentName: "CanvasDetails",
-    description:
-      "View and edit EXISTING charts on the active canvas tab (Graph only). You can ONLY update the chart name (title) and graph type (bar, line, pie) of charts that are already on the canvas. DO NOT use this to create new charts - to create a new chart, use the Graph component to generate it in chat first, then let the user add it to the canvas.",
-    propsSchema: canvasDetailsPropsSchema,
-  },
-);
+export const InteractableCanvasDetails = CanvasDetailsWrapper;

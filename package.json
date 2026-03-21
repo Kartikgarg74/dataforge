@@ -3,10 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:integration",
+    "load:baseline": "node scripts/load-baseline.cjs",
+    "db:migrate": "node scripts/db-migrate.cjs",
+    "db:seed": "node scripts/db-seed.cjs",
+    "db:init": "node scripts/init-db.js",
+    "db:setup": "npm run db:migrate && npm run db:seed",
     "prepare": "echo 'Skipping husky install in CI' || husky install"
   },
   "dependencies": {
@@ -19,9 +28,6 @@
     "@radix-ui/react-popover": "^1.1.1",
     "@radix-ui/react-slot": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.2",
-    "@standard-community/standard-json": "^0.3.5",
-    "@standard-schema/spec": "^1.1.0",
-    "@tambo-ai/react": "^0.69.1",
     "@tiptap/core": "^2.9.1",
     "@tiptap/pm": "^2.9.1",
     "@tiptap/extension-document": "^2.9.1",
@@ -55,6 +61,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.53.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/better-sqlite3": "^7.6.0",
     "@types/dompurify": "^3.0.5",
@@ -62,12 +69,14 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autocannon": "^7.15.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.10",
     "husky": "^9.0.11",
     "postcss": "^8",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   },
   "overrides": {
     "react": "19.1.1",

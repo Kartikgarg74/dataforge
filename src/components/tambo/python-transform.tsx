@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 
 export const pythonTransformSchema = z.object({
   code: z.string().describe('Python code that was executed'),
@@ -61,7 +62,7 @@ export function PythonTransform({ code, explanation, inputRows, outputRows, newC
       
       {showCode && (
         <div className="mb-3 p-3 bg-slate-800 rounded overflow-x-auto text-xs leading-relaxed">
-          <pre dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+          <pre dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? DOMPurify.sanitize(highlightedCode) : highlightedCode }} />
         </div>
       )}
       

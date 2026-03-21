@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 export const connectCardSchema = z.object({
-  service: z.enum(['neon', 'github', 'brave', 'airtable', 'notion']),
+  service: z.enum(['neon', 'github', 'airtable', 'notion']),
   status: z.enum(['disconnected', 'connecting', 'connected', 'error']),
   accountName: z.string().optional(),
   message: z.string().optional(),
@@ -12,7 +12,6 @@ export const connectCardSchema = z.object({
 const SERVICE_CONFIG = {
   neon: { icon: '🐘', name: 'Neon Database', color: 'green' },
   github: { icon: '🐙', name: 'GitHub', color: 'slate' },
-  brave: { icon: '🔍', name: 'Brave Search', color: 'orange' },
   airtable: { icon: '📊', name: 'Airtable', color: 'yellow' },
   notion: { icon: '📝', name: 'Notion', color: 'gray' },
 };

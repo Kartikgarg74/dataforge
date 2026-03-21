@@ -43,3 +43,19 @@ next-env.d.ts
 # claude code local settings
 .claude/settings.local.json
 .env*.local
+
+# working database (user data)
+/data/*.db
+/data/*.db-wal
+/data/*.db-shm
+
+# reports
+/reports/
+
+# capacitor native projects (generated)
+/ios/App/
+/android/app/build/
+
+# temp files
+/tmp/
+*.tmp

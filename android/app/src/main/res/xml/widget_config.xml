@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DataForge Android Widget Configuration
+
+  Widget Sizes:
+  - 1x1: Single metric number
+  - 2x1: Metric + trend indicator
+  - 4x2: Mini dashboard with 3 metrics
+
+  Implementation:
+  - Extends AppWidgetProvider
+  - Uses RemoteViews for layout
+  - WorkManager for periodic refresh
+  - EncryptedSharedPreferences for auth token
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:updatePeriodMillis="1800000"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description"
+    android:previewLayout="@layout/widget_preview" />

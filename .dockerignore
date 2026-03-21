@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.github
+.vercel
+*.md
+docs/
+tests/
+reports/
+.env.local
+.env*.local
+data/

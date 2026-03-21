@@ -1,14 +1,11 @@
 "use client";
-import { useMcpServers } from "@/components/tambo/mcp-config-modal";
-import { MessageThreadFull } from "@/components/tambo/message-thread-full";
+import { NativeChatThread } from "@/components/chat/thread";
 import ComponentsCanvas from "@/components/ui/components-canvas";
 import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
 import { InteractableTabs } from "@/components/ui/interactable-tabs";
-import { components } from "@/lib/tambo";
-import { TamboProvider } from "@tambo-ai/react";
-import { TamboMcpProvider } from "@tambo-ai/react/mcp";
-import { useSyncExternalStore } from "react";
-import { z } from "zod";
+import { ChatProvider } from "@/lib/chat/chat-provider";
+import { FileDropZone } from "@/components/data/file-drop-zone";
+import { useSyncExternalStore, useState, useCallback } from "react";
 
 const STORAGE_KEY = "tambo-demo-context-key";
 
@@ -30,196 +27,114 @@ function useContextKey(): string | null {
   return useSyncExternalStore(subscribe, getContextKey, () => null);
 }
 
-const rowSchema = z.object({}).passthrough();
-
-const columnSchema = z.object({
-  name: z.string(),
-  type: z.string(),
-  isPrimaryKey: z.boolean(),
-  isForeignKey: z.boolean(),
-});
-
-const tableSchema = z.object({
-  name: z.string(),
-  columns: z.array(columnSchema),
-  rowCount: z.number(),
-});
-
-const tools = [
-  // Database Tools
-  {
-    name: 'getDatabaseSchema',
-    description: 'Get database schema with tables and columns',
-    tool: async () => {
-      const response = await fetch('/api/schema');
-      const data = await response.json();
-      return { schema: data.schema, tables: data.tables };
-    },
-    inputSchema: z.object({}),
-    outputSchema: z.object({
-      schema: z.string(),
-      tables: z.array(tableSchema)
-    }),
-  },
-  {
-    name: 'executeSQL',
-    description: 'Execute SQL SELECT query on local database',
-    tool: async (params: { query: string }) => {
-      const response = await fetch('/api/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      return response.json();
-    },
-    inputSchema: z.object({ query: z.string() }),
-    outputSchema: z.object({
-      results: z.array(rowSchema),
-      columns: z.array(z.string()),
-      rowCount: z.number(),
-    }),
-  },
-  {
-    name: 'executePython',
-    description: 'Execute Python code to transform data',
-    tool: async (params: { code: string; data: z.infer<typeof rowSchema>[] }) => {
-      const response = await fetch('/api/python', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      return response.json();
-    },
-    inputSchema: z.object({ code: z.string(), data: z.array(rowSchema) }),
-    outputSchema: z.object({
-      success: z.boolean(),
-      result: z.array(rowSchema).optional(),
-      newColumns: z.array(z.string()).optional(),
-    }),
-  },
-
-  // MCP Integrations (Shells for now)
-    // 1. Neon - Demo mode (working)
-    {
-    name: 'showNeonDemo',
-    description: 'Show interactive Neon database demo with sample data',
-    tool: async () => ({
-        demoMode: true,
-        databaseName: 'demo-production-db',
-        tables: [
-        { name: 'users', rowCount: 4 },
-        { name: 'orders', rowCount: 5 },
-        { name: 'products', rowCount: 4 },
-        ],
-    }),
-    inputSchema: z.object({}),
-    outputSchema: z.object({
-        demoMode: z.literal(true),
-        databaseName: z.string(),
-        tables: z.array(z.object({ name: z.string(), rowCount: z.number() })),
-    }),
-    },
-
-    // 2. Brave Search - Mock for now
-    {
-    name: 'braveSearch',
-    description: 'Search the web for information and benchmarks',
-    tool: async (params: { query: string }) => ({
-        query: params.query,
-        results: [
-        { title: `Results for "${params.query}"`, url: '#', snippet: 'Search integration pending - this is a demo result' }
-        ],
-    }),
-    inputSchema: z.object({ query: z.string() }),
-    outputSchema: z.object({
-        query: z.string(),
-        results: z.array(z.object({ title: z.string(), url: z.string(), snippet: z.string() })),
-    }),
-    },
-
-    // 3. GitHub - Mock for now
-    {
-    name: 'githubConnect',
-    description: 'Connect to GitHub account',
-    tool: async () => ({
-        service: 'github',
-        status: 'connected',
-        accountName: 'demo-user',
-    }),
-    inputSchema: z.object({}),
-    outputSchema: z.object({
-        service: z.literal('github'),
-        status: z.enum(['connected', 'error']),
-        accountName: z.string().optional(),
-    }),
-    },
-
-    // 4. Airtable - Mock for now
-    {
-    name: 'airtableConnect',
-    description: 'Connect to Airtable',
-    tool: async () => ({
-        service: 'airtable',
-        status: 'connected',
-        accountName: 'Demo Workspace',
-    }),
-    inputSchema: z.object({}),
-    outputSchema: z.object({
-        service: z.literal('airtable'),
-        status: z.enum(['connected', 'error']),
-        accountName: z.string().optional(),
-    }),
-    },
-
-    // 5. Notion - Mock for now
-    {
-    name: 'notionConnect',
-    description: 'Connect to Notion workspace',
-    tool: async () => ({
-        service: 'notion',
-        status: 'connected',
-        accountName: 'Demo Workspace',
-    }),
-    inputSchema: z.object({}),
-    outputSchema: z.object({
-        service: z.literal('notion'),
-        status: z.enum(['connected', 'error']),
-        accountName: z.string().optional(),
-    }),
-    },
-];
-
 export default function Home() {
-  const mcpServers = useMcpServers();
   const contextKey = useContextKey();
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ id: string; name: string; sql: string }>>([]);
+  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
+
+  // Fetch top queries as suggestions
+  const loadSuggestions = useCallback(async () => {
+    if (suggestionsLoaded) return;
+    try {
+      const res = await fetch("/api/queries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "top" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.queries) {
+          setSuggestions(data.queries.slice(0, 6));
+        }
+      }
+    } catch {
+      // Silently ignore — suggestions are non-critical
+    } finally {
+      setSuggestionsLoaded(true);
+    }
+  }, [suggestionsLoaded]);
+
+  // Load suggestions on mount
+  useState(() => {
+    loadSuggestions();
+  });
+
+  const handleChatDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDraggingFile(true);
+    }
+  }, []);
+
+  const handleChatDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  }, []);
+
+  const handleChatDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    // The FileDropZone inside will handle the actual file processing
+  }, []);
 
   if (!contextKey) {
     return null;
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden relative">
-      <TamboProvider
-        apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
-        tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL!}
-        components={components}
-        tools={tools}
-        mcpServers={mcpServers}
-        contextKey={contextKey}
-      >
-        <TamboMcpProvider>
-          <div className="flex h-full overflow-hidden">
-            <div className="flex-1 overflow-hidden">
-              <MessageThreadFull />
-            </div>
-            <div className="hidden md:block w-[60%] overflow-auto">
-              <InteractableTabs interactableId="Tabs" />
-              <InteractableCanvasDetails interactableId="CanvasDetails" />
-              <ComponentsCanvas className="h-full" />
-            </div>
+    <div
+      className="h-screen flex flex-col overflow-hidden relative"
+      onDragOver={handleChatDragOver}
+      onDragLeave={handleChatDragLeave}
+      onDrop={handleChatDrop}
+    >
+      <ChatProvider threadId={contextKey} runtime="native">
+        <div className="flex h-full overflow-hidden">
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <NativeChatThread />
+            {/* Query suggestion chips */}
+            {suggestions.length > 0 && (
+              <div className="px-4 pb-2 flex flex-wrap gap-2">
+                {suggestions.map((q) => (
+                  <button
+                    key={q.id}
+                    onClick={() => {
+                      // Populate the chat input by dispatching a custom event
+                      const event = new CustomEvent("populate-chat-input", {
+                        detail: { text: q.sql || q.name },
+                      });
+                      window.dispatchEvent(event);
+                    }}
+                    className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300 transition-colors truncate max-w-[200px]"
+                    title={q.sql || q.name}
+                  >
+                    {q.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* File drop overlay when dragging files */}
+            {isDraggingFile && (
+              <div className="px-4 pb-2">
+                <FileDropZone
+                  className="border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                  onUploadComplete={() => setIsDraggingFile(false)}
+                  onError={() => setIsDraggingFile(false)}
+                />
+              </div>
+            )}
           </div>
-        </TamboMcpProvider>
-      </TamboProvider>
+          <div className="hidden md:block w-[60%] overflow-auto">
+            <InteractableTabs interactableId="Tabs" />
+            <InteractableCanvasDetails interactableId="CanvasDetails" />
+            <ComponentsCanvas className="h-full" />
+          </div>
+        </div>
+      </ChatProvider>
     </div>
   );
 }

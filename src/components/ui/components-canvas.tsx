@@ -1,7 +1,7 @@
 "use client";
 
 import { CanvasComponent, useCanvasStore } from "@/lib/canvas-storage";
-import { components } from "@/lib/tambo";
+import { getNativeComponentDefinition } from "@/lib/chat/component-registry";
 import { cn } from "@/lib/utils";
 import {
   DndContext,
@@ -16,7 +16,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TamboComponent } from "@tambo-ai/react";
 import {
   CheckIcon,
   PencilIcon,
@@ -175,9 +174,7 @@ export const ComponentsCanvas: React.FC<
   // Find component definition from registry
   const renderComponent = (componentProps: CanvasComponentProps) => {
     const componentType = componentProps._componentType;
-    const componentDef = components.find(
-      (comp: TamboComponent) => comp.name === componentType,
-    );
+    const componentDef = getNativeComponentDefinition(componentType);
 
     if (!componentDef) {
       return (
@@ -188,12 +185,13 @@ export const ComponentsCanvas: React.FC<
     }
 
     const Component = componentDef.component;
+    const GenericComponent =
+      Component as React.ComponentType<Record<string, unknown>>;
     // Filter out our custom props that shouldn't be passed to the component
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { _componentType, componentId, canvasId, _inCanvas, ...cleanProps } =
       componentProps;
 
-    return <Component {...cleanProps} />;
+    return <GenericComponent {...(cleanProps as Record<string, unknown>)} />;
   };
 
   const SortableItem: React.FC<{ componentProps: CanvasComponentProps }> = ({
@@ -318,6 +316,8 @@ export const ComponentsCanvas: React.FC<
                   autoFocus
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
+                  aria-label="Canvas name"
+                  placeholder="Canvas name"
                   className="bg-transparent border-b border-border/50 focus:outline-none text-sm w-24"
                 />
                 <button

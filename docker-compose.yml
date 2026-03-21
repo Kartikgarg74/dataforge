@@ -1,0 +1,53 @@
+# DataForge - Docker Compose for Self-Hosted Deployment
+#
+# Usage:
+#   docker compose up -d        # Start
+#   docker compose logs -f      # View logs
+#   docker compose down         # Stop
+#
+# Environment variables can be set in .env file
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_PROVIDER=${DB_PROVIDER:-sqlite}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - API_AUTH_REQUIRED=${API_AUTH_REQUIRED:-false}
+      - API_AUTH_KEY=${API_AUTH_KEY:-}
+      - ENABLE_PYTHON_EXECUTION=${ENABLE_PYTHON_EXECUTION:-false}
+    volumes:
+      # Persist uploaded data and working database
+      - dataforge-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Redis for query caching (Phase 2B+)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
+volumes:
+  dataforge-data:
+  # redis-data:

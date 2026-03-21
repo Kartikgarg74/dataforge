@@ -1,0 +1,50 @@
+{
+  "name": "DataForge — AI Database Explorer",
+  "short_name": "DataForge",
+  "description": "From raw database to ML-ready dataset in minutes. Upload, explore, clean, and export.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "categories": ["business", "productivity", "developer tools"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "share_target": {
+    "action": "/upload",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "file",
+          "accept": [
+            "text/csv",
+            "application/json",
+            ".parquet",
+            ".xlsx",
+            ".xls",
+            ".db",
+            ".sqlite"
+          ]
+        }
+      ]
+    }
+  }
+}
