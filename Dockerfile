@@ -7,8 +7,10 @@ WORKDIR /app
 # Install build tools for native modules (better-sqlite3)
 RUN apk add --no-cache python3 make g++
 
+# Copy package files and install deps
+# Using npm install instead of npm ci to avoid lock file version mismatches
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --ignore-scripts && npm rebuild better-sqlite3
 
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
