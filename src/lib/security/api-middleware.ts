@@ -43,7 +43,7 @@ export async function apiMiddleware(
     const csrfValid = await validateCsrf(request);
     if (!csrfValid) {
       logAudit({
-        action: AUDIT_ACTIONS?.CSRF_FAILURE || 'csrf_failure',
+        action: AUDIT_ACTIONS.CSRF_FAILURE,
         ipAddress: ip,
         userAgent: request.headers.get('user-agent') || undefined,
       });

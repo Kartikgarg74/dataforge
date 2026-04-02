@@ -18,6 +18,7 @@ export const AUDIT_ACTIONS = {
   CHAT_MESSAGE: 'chat.message',
   TRANSFORM_EXECUTE: 'transform.execute',
   PROFILE_RUN: 'profile.run',
+  CSRF_FAILURE: 'security.csrf_failure',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
