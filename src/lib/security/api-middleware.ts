@@ -39,12 +39,21 @@ export async function apiMiddleware(
   }
 
   // 2. CSRF validation (skip for GET/HEAD/OPTIONS and when explicitly skipped)
-  if (!options.skipCsrf) {
+  if (!options.skipCsrf && request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS') {
     const csrfValid = await validateCsrf(request);
     if (!csrfValid) {
-      // Log as warning but don't block for now -- many clients won't have CSRF tokens yet
-      // In production, change this to return a 403
-      console.warn(`[security] CSRF validation failed from ${ip}`);
+      logAudit({
+        action: AUDIT_ACTIONS?.CSRF_FAILURE || 'csrf_failure',
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent') || undefined,
+      });
+      return {
+        error: NextResponse.json(
+          { error: 'CSRF validation failed' },
+          { status: 403 }
+        ),
+        ip,
+      };
     }
   }
 

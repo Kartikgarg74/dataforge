@@ -16,25 +16,65 @@ const nativeMessageSchema = z.object({
 });
 
 /**
- * In-memory conversation history store.
+ * In-memory conversation history store with TTL eviction.
  * Maps threadId -> last 5 messages (user questions and assistant SQL responses).
  * Enables follow-up queries like "break that down by country".
+ *
+ * Bounded: max 500 threads, 1-hour TTL per thread, evicts oldest on overflow.
  */
-const conversationStore = new Map<string, Array<{ role: string; content: string }>>();
+const MAX_THREADS = 500;
+const THREAD_TTL_MS = 60 * 60 * 1000; // 1 hour
 const MAX_HISTORY = 5;
 
+interface ThreadEntry {
+  messages: Array<{ role: string; content: string }>;
+  lastAccessedAt: number;
+}
+
+const conversationStore = new Map<string, ThreadEntry>();
+
+function pruneStaleThreads(): void {
+  const now = Date.now();
+  for (const [threadId, entry] of conversationStore.entries()) {
+    if (now - entry.lastAccessedAt > THREAD_TTL_MS) {
+      conversationStore.delete(threadId);
+    }
+  }
+  // If still over limit, evict oldest
+  if (conversationStore.size > MAX_THREADS) {
+    const sorted = [...conversationStore.entries()].sort((a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt);
+    const toEvict = sorted.slice(0, conversationStore.size - MAX_THREADS);
+    for (const [threadId] of toEvict) {
+      conversationStore.delete(threadId);
+    }
+  }
+}
+
 function getConversationHistory(threadId: string): Array<{ role: string; content: string }> {
-  return conversationStore.get(threadId) || [];
+  const entry = conversationStore.get(threadId);
+  if (entry) {
+    entry.lastAccessedAt = Date.now();
+    return entry.messages;
+  }
+  return [];
 }
 
 function appendToConversation(threadId: string, role: string, content: string): void {
-  const history = conversationStore.get(threadId) || [];
-  history.push({ role, content });
-  // Keep only the last MAX_HISTORY messages
-  if (history.length > MAX_HISTORY) {
-    history.splice(0, history.length - MAX_HISTORY);
+  let entry = conversationStore.get(threadId);
+  if (!entry) {
+    // Prune before adding new thread
+    if (conversationStore.size >= MAX_THREADS) {
+      pruneStaleThreads();
+    }
+    entry = { messages: [], lastAccessedAt: Date.now() };
+    conversationStore.set(threadId, entry);
   }
-  conversationStore.set(threadId, history);
+  entry.messages.push({ role, content });
+  entry.lastAccessedAt = Date.now();
+  // Keep only the last MAX_HISTORY messages
+  if (entry.messages.length > MAX_HISTORY) {
+    entry.messages.splice(0, entry.messages.length - MAX_HISTORY);
+  }
 }
 
 // --- DB persistence layer for chat threads ---
@@ -92,14 +132,15 @@ function persistThreadToDb(threadId: string, messages: Array<{ role: string; con
 
 function getConversationHistoryWithDb(threadId: string): Array<{ role: string; content: string }> {
   // Check memory cache first
-  const cached = conversationStore.get(threadId);
-  if (cached && cached.length > 0) {
-    return cached;
+  const entry = conversationStore.get(threadId);
+  if (entry && entry.messages.length > 0) {
+    entry.lastAccessedAt = Date.now();
+    return entry.messages;
   }
   // Fall back to DB
   const fromDb = loadThreadFromDb(threadId);
   if (fromDb && fromDb.length > 0) {
-    conversationStore.set(threadId, fromDb);
+    conversationStore.set(threadId, { messages: fromDb, lastAccessedAt: Date.now() });
     return fromDb;
   }
   return [];
@@ -420,7 +461,8 @@ export async function POST(request: Request) {
       appendToConversation(input.threadId, "assistant", fullReply);
 
       // Persist to DB
-      const updatedHistory = conversationStore.get(input.threadId) || [];
+      const updatedEntry = conversationStore.get(input.threadId);
+      const updatedHistory = updatedEntry?.messages || [];
       persistThreadToDb(input.threadId, updatedHistory, latestUserMsg?.content?.slice(0, 80));
 
       const chunks = fullReply.match(/.{1,20}/g) || [];
