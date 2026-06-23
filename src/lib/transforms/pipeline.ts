@@ -248,7 +248,6 @@ function generateStepSQL(
       const oneHotCols = distinctRows
         .map((row) => {
           const val = row.val;
-          const safeVal = String(val).replace(/"/g, '""');
           const colName = `${p.column}_${String(val)}`;
           if (typeof val === 'string') {
             return `CASE WHEN ${col} = '${val.replace(/'/g, "''")}' THEN 1 ELSE 0 END AS "${colName}"`;

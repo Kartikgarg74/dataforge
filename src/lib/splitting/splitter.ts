@@ -273,12 +273,6 @@ function groupSplit(
       db.exec(`CREATE TABLE "${table}" AS SELECT * FROM "${source}" WHERE 0`);
       return;
     }
-    const placeholders = groupValues.map(() => '?').join(', ');
-    db.exec(`CREATE TABLE "${table}" AS SELECT * FROM "${source}" WHERE "${groupColumn}" IN (${placeholders})`);
-    // Note: SQLite exec doesn't support params, so we use a prepared statement
-    db.exec(`DROP TABLE IF EXISTS "${table}"`);
-    const stmt = db.prepare(`CREATE TABLE "${table}" AS SELECT * FROM "${source}" WHERE "${groupColumn}" IN (${placeholders})`);
-    // Since exec doesn't support params, use a workaround
     const inClause = groupValues.map((v) => `'${String(v).replace(/'/g, "''")}'`).join(', ');
     db.exec(`CREATE TABLE "${table}" AS SELECT * FROM "${source}" WHERE "${groupColumn}" IN (${inClause})`);
   };
