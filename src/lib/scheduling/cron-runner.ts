@@ -11,7 +11,6 @@ import path from 'path';
 import type { Schedule } from './types';
 import { renderWidgetToHTML } from './chart-renderer';
 import { generateReportEmail } from './email-template';
-import { deliverScheduledReport } from './delivery';
 import type { WidgetType, VisualizationConfig } from '@/lib/dashboard/types';
 
 const WORKING_DB_PATH = path.join(process.cwd(), 'data', 'working.db');
